@@ -1,0 +1,16 @@
+group 'ru.softlab.ib6'
+version '1.0-SNAPSHOT'
+
+apply plugin: 'java'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'org.apache.activemq:activemq-client:5.15.1'
+    compile 'org.slf4j:slf4j-nop:1.7.25' // чтобы в стандартный поток вывода не писались логи
+    testCompile 'junit:junit:4.12'
+}

@@ -1,0 +1,27 @@
+version: "3"
+
+services:
+  amq01:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8161:8161"
+      - "62001:62001"
+      - "61616:61616"
+    networks:
+      - mq-net
+
+  amq02:
+      build:
+        context: .
+        dockerfile: Dockerfile
+      ports:
+        - "8162:8161"
+        - "62002:62001"
+        - "61617:61616"
+      networks:
+        - mq-net
+
+networks:
+  mq-net:
