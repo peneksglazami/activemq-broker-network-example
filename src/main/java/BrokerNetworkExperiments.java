@@ -13,8 +13,8 @@ import java.util.Random;
  */
 public class BrokerNetworkExperiments {
 
-    private static final String MQ_01_ADDRESS = "tcp://192.168.99.100:61616";
-    private static final String MQ_02_ADDRESS = "tcp://192.168.99.100:61617";
+    private static final String MQ_01_ADDRESS = "tcp://localhost:61616";
+    private static final String MQ_02_ADDRESS = "tcp://localhost:61617";
     private static final Properties PROPERTIES_1 = new Properties();
     private static final Properties PROPERTIES_2 = new Properties();
 
@@ -41,6 +41,9 @@ public class BrokerNetworkExperiments {
 
         // один producer, два consumer'а, но один медленный
         oneProducerTwoConsumerByOneIsSlow();
+
+        // один producer и два consumer на разных брокерах; общение через топик
+        oneSubscriberOnePublisher();
     }
 
     /**
@@ -366,7 +369,7 @@ public class BrokerNetworkExperiments {
         connection2.close();
     }
 
-    private static void sendMessage(ConnectionFactory connectionFactory, Queue queue, String correlationId) throws JMSException {
+    private static void sendMessage(ConnectionFactory connectionFactory, Destination destination, String correlationId) throws JMSException {
         Connection connection = connectionFactory.createConnection();
         try {
             connection.start();
@@ -379,7 +382,7 @@ public class BrokerNetworkExperiments {
                 bytesMessage.writeBytes(bytes);
                 bytesMessage.setJMSCorrelationID(correlationId);
 
-                MessageProducer messageProducer = session.createProducer(queue);
+                MessageProducer messageProducer = session.createProducer(destination);
                 try {
                     messageProducer.setTimeToLive(30000);
                     messageProducer.send(bytesMessage);
@@ -393,6 +396,63 @@ public class BrokerNetworkExperiments {
         } finally {
             connection.close();
         }
+    }
+
+
+    /**
+     * Запущены 2 Active MQ. К каждому подключено по 1 consumer. К одному подключен producer, который
+     * отправляют 10 сообщений в топик.
+     * Consumer'ы на каждом брокере получают все запросы.
+     *
+     * @throws Exception
+     */
+    private static void oneSubscriberOnePublisher() throws Exception {
+        System.out.println();
+        System.out.println("2 Active MQ, 1 Producers (in DataCenter #2), 2 Consumer (in DataCenter #1 & #2), 1 topic");
+
+        InitialContext context1 = new InitialContext(PROPERTIES_1);
+        final ConnectionFactory connectionFactory1 = (ConnectionFactory) context1.lookup("ConnectionFactory");
+        final Topic topicCluster1 = (Topic) context1.lookup("dynamicTopics/topic");
+
+        InitialContext context2 = new InitialContext(PROPERTIES_2);
+        final ConnectionFactory connectionFactory2 = (ConnectionFactory) context2.lookup("ConnectionFactory");
+        final Topic topicCluster2 = (Topic) context2.lookup("dynamicTopics/topic");
+
+        Connection connection1 = connectionFactory1.createConnection();
+        Session session1 = connection1.createSession(false, Session.AUTO_ACKNOWLEDGE);
+        MessageConsumer consumer1 = session1.createConsumer(topicCluster1);
+        consumer1.setMessageListener(message -> {
+            try {
+                System.out.println("Consumer 1 processed message \"" + message.getJMSCorrelationID() + "\"");
+            } catch (JMSException e) {
+                e.printStackTrace();
+            }
+        });
+
+        Connection connection2 = connectionFactory2.createConnection();
+        Session session2 = connection2.createSession(false, Session.AUTO_ACKNOWLEDGE);
+        MessageConsumer consumer2 = session2.createConsumer(topicCluster2);
+        consumer2.setMessageListener(message -> {
+            try {
+                System.out.println("Consumer 2 processed message \"" + message.getJMSCorrelationID() + "\"");
+            } catch (JMSException e) {
+                e.printStackTrace();
+            }
+        });
+
+        connection1.start();
+        connection2.start();
+
+        for (int i = 1; i <= 10; i++) {
+            sendMessage(connectionFactory2, topicCluster2, "DataCenter #2 - " + i);
+        }
+
+        Thread.sleep(3000);
+
+        System.out.println();
+
+        session1.close();
+        connection1.close();
     }
 }
 
