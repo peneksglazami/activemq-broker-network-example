@@ -1,5 +1,7 @@
 import javax.jms.*;
 import javax.naming.InitialContext;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 
@@ -44,6 +46,9 @@ public class BrokerNetworkExperiments {
 
         // один producer и два consumer на разных брокерах; общение через топик
         oneSubscriberOnePublisher();
+
+        // два producer, один consumer, который подключается к очереди с селектором
+        twoProducerOneConsumerWithSelector();
     }
 
     /**
@@ -369,7 +374,13 @@ public class BrokerNetworkExperiments {
         connection2.close();
     }
 
-    private static void sendMessage(ConnectionFactory connectionFactory, Destination destination, String correlationId) throws JMSException {
+    private static void sendMessage(ConnectionFactory connectionFactory, Destination destination,
+                                    String correlationId) throws JMSException {
+        sendMessage(connectionFactory, destination, correlationId, null);
+    }
+
+    private static void sendMessage(ConnectionFactory connectionFactory, Destination destination,
+                                    String correlationId, Map<String, String> headers) throws JMSException {
         Connection connection = connectionFactory.createConnection();
         try {
             connection.start();
@@ -381,6 +392,15 @@ public class BrokerNetworkExperiments {
                 new Random().nextBytes(bytes);
                 bytesMessage.writeBytes(bytes);
                 bytesMessage.setJMSCorrelationID(correlationId);
+                if (headers != null) {
+                    headers.forEach((key, value) -> {
+                        try {
+                            bytesMessage.setStringProperty(key, value);
+                        } catch (JMSException e) {
+                            throw new RuntimeException(e);
+                        }
+                    });
+                }
 
                 MessageProducer messageProducer = session.createProducer(destination);
                 try {
@@ -445,6 +465,66 @@ public class BrokerNetworkExperiments {
 
         for (int i = 1; i <= 10; i++) {
             sendMessage(connectionFactory2, topicCluster2, "DataCenter #2 - " + i);
+        }
+
+        Thread.sleep(3000);
+
+        System.out.println();
+
+        session1.close();
+        connection1.close();
+    }
+
+
+    /**
+     * Запущены 2 Active MQ. К одному подключён consumer, который случает очередь по селектору service='ABC'. К каждому ActiveMQ
+     * подключается по одному producer, которые отправляют по 10 сообщений для сервиса ABC и по 10 для сервиса XYZ.
+     * Consumer обрабатывает все 20 запросов, адресованных сервису ABC.
+     *
+     * @throws Exception
+     */
+    private static void twoProducerOneConsumerWithSelector() throws Exception {
+        System.out.println();
+        System.out.println("2 Active MQ, 2 Producers, 1 Consumer with selector (in DataCenter #1)");
+
+        InitialContext context1 = new InitialContext(PROPERTIES_1);
+        final ConnectionFactory connectionFactory1 = (ConnectionFactory) context1.lookup("ConnectionFactory");
+        final Queue queueCluster1 = (Queue) context1.lookup("dynamicQueues/test");
+
+        InitialContext context2 = new InitialContext(PROPERTIES_2);
+        final ConnectionFactory connectionFactory2 = (ConnectionFactory) context2.lookup("ConnectionFactory");
+        final Queue queueCluster2 = (Queue) context2.lookup("dynamicQueues/test");
+
+        Connection connection1 = connectionFactory1.createConnection();
+        Session session1 = connection1.createSession(false, Session.AUTO_ACKNOWLEDGE);
+        MessageConsumer consumer1 = session1.createConsumer(queueCluster1, "service = 'ABC'");
+        consumer1.setMessageListener(new MessageListener() {
+            @Override
+            public void onMessage(Message message) {
+                try {
+                    System.out.println("Consumer 1 processed message \"" + message.getJMSCorrelationID() + "\"; service = " + message.getStringProperty("service"));
+                } catch (JMSException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        connection1.start();
+
+        for (int i = 1; i <= 10; i++) {
+            sendMessage(connectionFactory1, queueCluster1, "DataCenter #1 - " + String.valueOf(i), Collections.singletonMap("service", "ABC"));
+        }
+
+        for (int i = 1; i <= 10; i++) {
+            sendMessage(connectionFactory2, queueCluster2, "DataCenter #2 - " + String.valueOf(i), Collections.singletonMap("service", "ABC"));
+        }
+
+        for (int i = 1; i <= 10; i++) {
+            sendMessage(connectionFactory1, queueCluster1, "DataCenter #1 - " + String.valueOf(i), Collections.singletonMap("service", "XYZ"));
+        }
+
+        for (int i = 1; i <= 10; i++) {
+            sendMessage(connectionFactory2, queueCluster2, "DataCenter #2 - " + String.valueOf(i), Collections.singletonMap("service", "XYZ"));
         }
 
         Thread.sleep(3000);
