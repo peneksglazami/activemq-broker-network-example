@@ -10,7 +10,7 @@ repositories {
 }
 
 dependencies {
-    compile 'org.apache.activemq:activemq-client:5.15.1'
-    compile 'org.slf4j:slf4j-nop:1.7.25' // чтобы в стандартный поток вывода не писались логи
-    testCompile 'junit:junit:4.12'
+    implementation 'org.apache.activemq:activemq-client:5.15.6'
+    implementation 'org.slf4j:slf4j-nop:1.7.25' // чтобы в стандартный поток вывода не писались логи
+    testImplementation 'junit:junit:4.13.1'
 }
