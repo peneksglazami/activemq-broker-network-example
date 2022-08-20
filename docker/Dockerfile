@@ -2,4 +2,3 @@ FROM smaject/activemq
 
 ENV NETWORK_CONNECTION_PORT=62001
 EXPOSE ${NETWORK_CONNECTION_PORT}
-COPY activemq.xml ${ACTIVEMQ_HOME}/conf/activemq.xml

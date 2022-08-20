@@ -1,7 +1,7 @@
 version: "3"
 
 services:
-  amq01:
+  dc1-amq01:
     build:
       context: .
       dockerfile: Dockerfile
@@ -9,19 +9,57 @@ services:
       - "8161:8161"
       - "62001:62001"
       - "61616:61616"
+    volumes:
+      - type: bind
+        source: ./activemq-dc1-amq01.xml
+        target: /opt/activemq/apache-activemq-5.15.0/conf/activemq.xml
     networks:
       - mq-net
 
-  amq02:
-      build:
-        context: .
-        dockerfile: Dockerfile
-      ports:
-        - "8162:8161"
-        - "62002:62001"
-        - "61617:61616"
-      networks:
-        - mq-net
+  dc1-amq02:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8162:8161"
+      - "62002:62001"
+      - "61617:61616"
+    volumes:
+      - type: bind
+        source: ./activemq-dc1-amq02.xml
+        target: /opt/activemq/apache-activemq-5.15.0/conf/activemq.xml
+    networks:
+      - mq-net
+
+  dc2-amq03:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8163:8161"
+      - "62003:62001"
+      - "61618:61616"
+    volumes:
+      - type: bind
+        source: ./activemq-dc2-amq03.xml
+        target: /opt/activemq/apache-activemq-5.15.0/conf/activemq.xml
+    networks:
+      - mq-net
+
+  dc2-amq04:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8164:8161"
+      - "62004:62001"
+      - "61619:61616"
+    volumes:
+      - type: bind
+        source: ./activemq-dc2-amq04.xml
+        target: /opt/activemq/apache-activemq-5.15.0/conf/activemq.xml
+    networks:
+      - mq-net
 
 networks:
   mq-net:

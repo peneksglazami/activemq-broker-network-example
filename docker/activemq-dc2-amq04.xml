@@ -103,9 +103,6 @@
         </systemUsage>
 
         <networkConnectors>
-            <networkConnector name="networkConnector"
-                              uri="multicast://default?group=broker"
-                              decreaseNetworkConsumerPriority="true"/>
         </networkConnectors>
 
         <!--
